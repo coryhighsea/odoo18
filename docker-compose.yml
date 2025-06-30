@@ -11,7 +11,7 @@ services:
 
   # Odoo 18 Application Service
   odoo:
-    image: odoo:18.0
+    build: .
     container_name: odoo18-app
     depends_on:
       - db
@@ -20,8 +20,6 @@ services:
       - "8072:8072" # Live chat (optional)
     volumes:
       # Mounts a local folder for your custom addons
-      # - ./addons:/mnt/extra-addons
-      - /tmp/test-addons:/mnt/extra-addons 
       # Mounts a volume to persist Odoo's data (filestore)
       - odoo-web-data:/var/lib/odoo
     restart: always
