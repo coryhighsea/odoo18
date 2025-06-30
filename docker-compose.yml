@@ -24,13 +24,13 @@ services:
       - "8072:8072" # Live chat (optional)
     volumes:
       # Mounts a local folder for your custom addons
-      - ./addons:/mnt/extra-addons
+      # - ./addons:/mnt/extra-addons
       # Mounts a volume to persist Odoo's data (filestore)
       - odoo-web-data:/var/lib/odoo
     environment:
       - HOST=db
       - USER=odoo
-      - PASSWORD=MyStrongAdminPassword!
+      - PASSWORD=odoo
       - PORT=5442
     restart: always
 
