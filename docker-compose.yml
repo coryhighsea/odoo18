@@ -7,7 +7,7 @@ services:
     container_name: odoo18-db
     environment:
       - POSTGRES_USER=odoo
-      - POSTGRES_PASSWORD=odoo
+      - POSTGRES_PASSWORD=MyStrongAdminPassword!
       - POSTGRES_DB=postgres
     volumes:
       - odoo-db-data:/var/lib/postgresql/data
