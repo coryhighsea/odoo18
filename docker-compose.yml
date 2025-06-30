@@ -30,7 +30,7 @@ services:
     environment:
       - HOST=db
       - USER=odoo
-      - PASSWORD=odoo
+      - PASSWORD=MyStrongAdminPassword!
       - PORT=5432
     restart: always
 
