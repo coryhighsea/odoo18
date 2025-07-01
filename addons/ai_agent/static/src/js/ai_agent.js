@@ -1,8 +1,7 @@
-/** @odoo-module **/
-
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { Component, useState, onMounted, useRef } from "@odoo/owl";
+import { jsonrpc } from "@web/core/network/rpc_service"; // <-- The key new import
 
 class AIAgentSystray extends Component {
     setup() {
@@ -12,11 +11,13 @@ class AIAgentSystray extends Component {
             isOpen: false,
             isLoading: false,
         });
-        this.rpc = useService("rpc");
+        
+        // We can still get the notification service, which is working fine.
         this.notification = useService("notification");
         this.chatContainerRef = useRef("chatContainer");
 
         onMounted(() => {
+            // Add a welcome message when the component is ready.
             this.state.messages.push({
                 content: "Hello! How can I help you with Odoo today?",
                 isUser: false
@@ -24,18 +25,11 @@ class AIAgentSystray extends Component {
         });
     }
 
-    // This function will get the AI service URL from Odoo's backend
-    async getAIServiceUrl() {
-        // This is a much better practice than hardcoding URLs in JS.
-        // We'll create this controller route in Python next.
-        return this.rpc("/ai_agent/get_config");
-    }
-
     async sendMessage() {
         const messageText = this.state.inputMessage.trim();
         if (!messageText || this.state.isLoading) return;
 
-        // Add user message to UI
+        // Add user message to UI immediately
         this.state.messages.push({ content: messageText, isUser: true });
         this.state.inputMessage = "";
         this.state.isLoading = true;
@@ -48,11 +42,14 @@ class AIAgentSystray extends Component {
         }));
 
         try {
-            const config = await this.getAIServiceUrl();
-            if (!config.ai_agent_url) {
+            // Use the direct jsonrpc function to get the configuration from the Odoo backend.
+            const config = await jsonrpc("/ai_agent/get_config");
+            
+            if (!config || !config.ai_agent_url) {
                 throw new Error("AI Agent URL is not configured in Odoo's System Parameters.");
             }
 
+            // Make the call to your Python AI service
             const response = await fetch(`${config.ai_agent_url}/chat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -71,7 +68,7 @@ class AIAgentSystray extends Component {
             this.state.messages.push({ content: data.response, isUser: false });
 
         } catch (error) {
-            const errorMessage = "Error connecting to AI service: " + error.message;
+            const errorMessage = "Error: " + error.message;
             this.notification.add(errorMessage, { type: "danger" });
             this.state.messages.push({ content: errorMessage, isUser: false });
             console.error("Error:", error);
@@ -89,7 +86,7 @@ class AIAgentSystray extends Component {
     }
 
     scrollToBottom() {
-        // Use a timeout to wait for OWL to render the new message
+        // Use a timeout to wait for OWL to render the new message before scrolling
         setTimeout(() => {
             const container = this.chatContainerRef.el;
             if (container) {
@@ -106,9 +103,9 @@ class AIAgentSystray extends Component {
     }
 }
 
-AIAgentSystray.template = "ai_agent.AIAgentSystray"; // Updated template name
+AIAgentSystray.template = "ai_agent.AIAgentSystray";
 
-// Add the component to the systray
+// Add the component to the systray registry
 registry.category("systray").add("ai_agent.AIAgentSystray", {
     Component: AIAgentSystray,
 });
