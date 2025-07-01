@@ -1,7 +1,6 @@
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { Component, useState, onMounted, useRef } from "@odoo/owl";
-import { rpc } from "@web/core/network/rpc_service";
 
 class AIAgentSystray extends Component {
     setup() {
@@ -14,6 +13,7 @@ class AIAgentSystray extends Component {
         
         // We can still get the notification service, which is working fine.
         this.notification = useService("notification");
+        this.rpc = useService("rpc");
         this.chatContainerRef = useRef("chatContainer");
 
         onMounted(() => {
@@ -43,9 +43,9 @@ class AIAgentSystray extends Component {
 
         try {
             // Use the direct jsonrpc function to get the configuration from the Odoo backend.
-            const config = await rpc.call("/ai_agent/get_config", {});
+            const config = await this.rpc.call("/ai_agent/get_config", {});
             
-            if (!config || !config.ai_agent_url) {
+            if (!config || !config.ai_agent_url || !config.ai_agent_api_key) {
                 throw new Error("AI Agent URL is not configured in Odoo's System Parameters.");
             }
 
