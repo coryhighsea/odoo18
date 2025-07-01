@@ -12,7 +12,6 @@
     'website': 'https://coryhisey.com',
     'depends': ['base', 'web', 'mail'],  # 'base' is included with 'web', so it's not strictly needed here
 
-
     'assets': {
         'web.assets_backend': [
             # Corrected paths relative to the addon root directory
