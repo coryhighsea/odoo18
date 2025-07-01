@@ -52,7 +52,7 @@ class AIAgentSystray extends Component {
             // Make the call to your Python AI service
             const response = await fetch(`${config.ai_agent_url}/chat`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", "X-API-Key": config.ai_agent_api_key },
                 body: JSON.stringify({
                     message: messageText,
                     conversation_history: conversationHistory,
