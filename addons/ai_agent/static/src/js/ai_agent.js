@@ -1,7 +1,6 @@
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { Component, useState, onMounted, useRef } from "@odoo/owl";
-import { jsonrpc } from "@web/core/network/rpc_service"; // <-- The key new import
 
 class AIAgentSystray extends Component {
     setup() {
@@ -43,7 +42,7 @@ class AIAgentSystray extends Component {
 
         try {
             // Use the direct jsonrpc function to get the configuration from the Odoo backend.
-            const config = await jsonrpc("/ai_agent/get_config");
+            const config = await this.env.services.rpc("/ai_agent/get_config");
             
             if (!config || !config.ai_agent_url) {
                 throw new Error("AI Agent URL is not configured in Odoo's System Parameters.");
