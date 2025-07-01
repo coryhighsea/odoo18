@@ -1,7 +1,7 @@
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { Component, useState, onMounted, useRef } from "@odoo/owl";
-import { patchSystray } from "@web/core/utils/patch_systray";
+// import { patchSystray } from "@web/core/utils/patch_systray";
 
 class AIAgentSystray extends Component {
     setup() {
