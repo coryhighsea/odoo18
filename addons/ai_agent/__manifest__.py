@@ -10,7 +10,7 @@
     'license': 'LGPL-3',
     'author': 'Cory Hisey',
     'website': 'https://coryhisey.com',
-    'depends': ['base', 'web', 'mail'],  # 'base' is included with 'web', so it's not strictly needed here
+    'depends': ['web', 'mail'],  # 'base' is included with 'web', so it's not strictly needed here
 
     'assets': {
         'web.assets_backend': [
