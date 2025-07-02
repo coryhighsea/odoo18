@@ -44,7 +44,7 @@ class AIAgentSystray extends Component {
 
         try {
             // Use the direct jsonrpc function to get the configuration from the Odoo backend.
-            const config = await this.rpc("/ai_agent/get_config", {});
+            const config = await this.rpc.call("/ai_agent/get_config", {});
             
             if (!config || !config.ai_agent_url || !config.ai_agent_api_key) {
                 throw new Error("AI Agent URL is not configured in Odoo's System Parameters.");
