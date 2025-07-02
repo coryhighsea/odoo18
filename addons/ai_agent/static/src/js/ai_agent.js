@@ -3,21 +3,17 @@ import { useService } from "@web/core/utils/hooks";
 import { Component, useState, onMounted, useRef } from "@odoo/owl";
 import { jsonrpc } from "@web/core/network/rpc_service";
 
-class AIAgentSystray extends Component {
+class AIAgentWidget extends Component {
     setup() {
         this.state = useState({
             messages: [],
             inputMessage: "",
             isOpen: false,
-            isLoading: false
+            isLoading: false,
         });
-        
-        // We can still get the notification service, which is working fine.
         this.notification = useService("notification");
         this.chatContainerRef = useRef("chatContainer");
-
         onMounted(() => {
-            // Add a welcome message when the component is ready.
             this.state.messages.push({
                 content: "Hello! How can I help you with Odoo today?",
                 isUser: false
@@ -44,7 +40,6 @@ class AIAgentSystray extends Component {
         try {
             // Use jsonrpc to get the configuration from the Odoo backend.
             const config = await jsonrpc("/ai_agent/get_config", {});
-            
             if (!config || !config.ai_agent_url || !config.ai_agent_api_key) {
                 throw new Error("AI Agent URL is not configured in Odoo's System Parameters.");
             }
@@ -103,8 +98,9 @@ class AIAgentSystray extends Component {
     }
 }
 
-AIAgentSystray.template = "ai_agent.AIAgentSystray";
+AIAgentWidget.template = "ai_agent.AIAgentSystray";
 
-registry.category("systray").add("ai_agent.AIAgentSystray", {
-    Component: AIAgentSystray,
+// Register the widget as a main component (floating widget on all pages)
+registry.category("main_components").add("ai_agent.AIAgentWidget", {
+    Component: AIAgentWidget,
 });
