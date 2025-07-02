@@ -8,8 +8,7 @@ class AIAgentSystray extends Component {
             messages: [],
             inputMessage: "",
             isOpen: false,
-            isLoading: false,
-            conversationHistory: []
+            isLoading: false
         });
         
         // We can still get the notification service, which is working fine.
