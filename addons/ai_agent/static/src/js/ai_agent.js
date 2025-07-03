@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, useState, onMounted, useRef } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
+import { Component, useState, onMounted } from "@odoo/owl";
 
 class AIAgentSystray extends Component {
     setup() {
@@ -11,33 +11,36 @@ class AIAgentSystray extends Component {
             inputMessage: "",
             isOpen: false,
             isLoading: false,
+            conversationHistory: []
         });
-        this.chatContainerRef = useRef("chatContainer");
         onMounted(() => {
-            this.state.messages.push({
-                content: "Hello! How can I help you with Odoo today?",
-                isUser: false
-            });
+            if (this.state.isOpen) {
+                this.scrollToBottom();
+            }
         });
     }
 
     async sendMessage() {
-        const messageText = this.state.inputMessage.trim();
-        if (!messageText || this.state.isLoading) return;
+        if (!this.state.inputMessage.trim() || this.state.isLoading) return;
 
-        // Add user message to UI immediately
-        this.state.messages.push({ content: messageText, isUser: true });
+        const message = this.state.inputMessage;
+        this.state.messages.push({ content: message, isUser: true });
         this.state.inputMessage = "";
         this.state.isLoading = true;
-        this.scrollToBottom();
-
-        // Prepare the conversation history for the AI
-        const conversationHistory = this.state.messages.slice(0, -1).map(msg => ({
-            role: msg.isUser ? "user" : "assistant",
-            content: msg.content
-        }));
 
         try {
+            // Prepare conversation history
+            const conversationHistory = this.state.conversationHistory.map(msg => ({
+                role: msg.isUser ? "user" : "assistant",
+                content: msg.content
+            }));
+
+            // Add current message to history
+            conversationHistory.push({
+                role: "user",
+                content: message
+            });
+
             // Use rpc to get the configuration from the Odoo backend.
             const config = await rpc("/ai_agent/get_config", {});
             if (!config || !config.ai_agent_url || !config.ai_agent_api_key) {
@@ -49,7 +52,7 @@ class AIAgentSystray extends Component {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "api-Key": config.ai_agent_api_key },
                 body: JSON.stringify({
-                    message: messageText,
+                    message: message,
                     conversation_history: conversationHistory,
                 }),
             });
@@ -60,15 +63,22 @@ class AIAgentSystray extends Component {
             }
 
             const data = await response.json();
-            this.state.messages.push({ content: data.response, isUser: false });
 
+            // Add AI response to messages and history
+            this.state.messages.push({ content: data.response, isUser: false });
+            this.state.conversationHistory = conversationHistory.concat([{
+                role: "assistant",
+                content: data.response
+            }]);
+
+            // Scroll to bottom of chat
+            this.scrollToBottom();
         } catch (error) {
             const errorMessage = "Error: " + error.message;
             this.state.messages.push({ content: errorMessage, isUser: false });
             console.error("Error:", error);
         } finally {
             this.state.isLoading = false;
-            this.scrollToBottom();
         }
     }
 
@@ -80,26 +90,26 @@ class AIAgentSystray extends Component {
     }
 
     scrollToBottom() {
-        // Use a timeout to wait for OWL to render the new message before scrolling
-        setTimeout(() => {
-            const container = this.chatContainerRef.el;
-            if (container) {
-                container.scrollTop = container.scrollHeight;
-            }
-        }, 0);
+        if (!this.el) return;
+        const chatContainer = this.el.querySelector(".o_chat_container");
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
     }
 
     toggleChat() {
         this.state.isOpen = !this.state.isOpen;
         if (this.state.isOpen) {
-            this.scrollToBottom();
+            // Use setTimeout to ensure the DOM is updated before scrolling
+            setTimeout(() => this.scrollToBottom(), 0);
         }
     }
 }
 
 AIAgentSystray.template = "ai_agent.AIAgentSystray";
+AIAgentSystray.props = {};
 
-// Register the widget as a main component (floating widget on all pages)
+// Add the widget to the systray
 registry.category("systray").add("ai_agent.AIAgentSystray", {
     Component: AIAgentSystray,
 });
