@@ -100,6 +100,6 @@ class AIAgentSystray extends Component {
 AIAgentSystray.template = "ai_agent.AIAgentSystray";
 
 // Register the widget as a main component (floating widget on all pages)
-registry.category("systray").add("ai_agent.AIAgentWidget", {
-    Component: AIAgentWidget,
+registry.category("systray").add("ai_agent.AIAgentSystray", {
+    Component: AIAgentSystray,
 });
