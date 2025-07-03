@@ -92,7 +92,7 @@ class AIAgentSystray extends Component {
             const data = await response.json();
 
             // RenderAI response to messages and history
-            const html = window.DOMPurify.sanitize(window.marked.parse(data.response));
+            const html = window.DOMPurify.sanitize(data.response);
             this.state.messages.push({ content: html, isUser: false, isHtml: true });
             this.state.conversationHistory = conversationHistory.concat([{
                 role: "assistant",
