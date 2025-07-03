@@ -85,7 +85,8 @@ class AIAgentSystray extends Component {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
+                console.error("API error details:", errorData);
+                throw new Error(JSON.stringify(errorData));
             }
 
             const data = await response.json();
