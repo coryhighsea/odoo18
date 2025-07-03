@@ -40,7 +40,7 @@
             </div>
         </div>
     </t>
-    <t t-name="ai_agent.PasswordModal">
+    <t t-name="ai_agent_odoo.PasswordModal">
         <div class="modal-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:2000;display:flex;align-items:center;justify-content:center;">
             <div class="modal-content" style="background:white;padding:2em;border-radius:8px;min-width:300px;">
                 <h3>Enter your Odoo password</h3>

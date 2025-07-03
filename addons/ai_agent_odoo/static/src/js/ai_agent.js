@@ -4,6 +4,7 @@ import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
 import { Component, useState, onMounted } from "@odoo/owl";
 
+// Password modal component
 export class PasswordModal extends Component {
     setup() {
         this.state = useState({ password: "" });
@@ -18,7 +19,7 @@ export class PasswordModal extends Component {
         this.props.onCancel();
     }
 }
-PasswordModal.template = "ai_agent.PasswordModal";
+PasswordModal.template = "ai_agent_odoo.PasswordModal";
 PasswordModal.props = ["onSubmit", "onCancel"];
 
 class AIAgentSystray extends Component {
@@ -29,7 +30,7 @@ class AIAgentSystray extends Component {
             isOpen: false,
             isLoading: false,
             conversationHistory: [],
-            odooPassword: null,
+            odooPassword: null, // Store password in memory only
             showPasswordModal: false,
             passwordPromise: null,
         });
@@ -45,6 +46,22 @@ class AIAgentSystray extends Component {
         return new Promise((resolve, reject) => {
             this.state.passwordPromise = { resolve, reject };
         });
+    }
+
+    onPasswordSubmit(password) {
+        this.state.odooPassword = password;
+        this.state.showPasswordModal = false;
+        if (this.state.passwordPromise) {
+            this.state.passwordPromise.resolve(password);
+            this.state.passwordPromise = null;
+        }
+    }
+    onPasswordCancel() {
+        this.state.showPasswordModal = false;
+        if (this.state.passwordPromise) {
+            this.state.passwordPromise.reject(new Error("Password is required to use the AI agent."));
+            this.state.passwordPromise = null;
+        }
     }
 
     async sendMessage() {
@@ -71,7 +88,7 @@ class AIAgentSystray extends Component {
             // Use rpc to get the configuration from the Odoo backend.
             const config = await rpc("/ai_agent_odoo/get_config", {});
             if (!config || !config.ai_agent_url || !config.ai_agent_api_key || !config.db || !config.login) {
-                throw new Error("AI Agent URL or Odoo Credentials are not configured in Odoo's System Parameters.");
+                throw new Error("AI Agent URL or Odoo credentials are not configured in Odoo's System Parameters.");
             }
 
             // Prompt for password if not already set
@@ -92,7 +109,7 @@ class AIAgentSystray extends Component {
                 conversation_history: conversationHistory,
             };
 
-            // Make the call to your Python AI service
+            // Make the call to your Python AI service (new endpoint)
             const response = await fetch(`${config.ai_agent_url}/api/v1/agent/invoke`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "api-Key": config.ai_agent_api_key },
@@ -107,7 +124,7 @@ class AIAgentSystray extends Component {
 
             const data = await response.json();
 
-            // RenderAI response to messages and history
+            // Render AI response as HTML (sanitize only, since LLM returns HTML)
             const html = window.DOMPurify.sanitize(data.response);
             this.state.messages.push({ content: html, isUser: false, isHtml: true });
             this.state.conversationHistory = conversationHistory.concat([{
@@ -146,23 +163,6 @@ class AIAgentSystray extends Component {
         if (this.state.isOpen) {
             // Use setTimeout to ensure the DOM is updated before scrolling
             setTimeout(() => this.scrollToBottom(), 0);
-        }
-    }
-
-    onPasswordSubmit(password) {
-        this.state.odooPassword = password;
-        this.state.showPasswordModal = false;
-        if (this.state.passwordPromise) {
-            this.state.passwordPromise.resolve(password);
-            this.state.passwordPromise = null;
-        }
-    }
-
-    onPasswordCancel() {
-        this.state.showPasswordModal = false;
-        if (this.state.passwordPromise) {
-            this.state.passwordPromise.reject(new Error("Password is required to use the AI agent."));
-            this.state.passwordPromise = null;
         }
     }
 }
