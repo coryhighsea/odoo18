@@ -1,7 +1,6 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { useService } from "@web/core/utils/hooks";
 import { Component, useState, onMounted, useRef } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 
@@ -13,7 +12,6 @@ class AIAgentWidget extends Component {
             isOpen: false,
             isLoading: false,
         });
-        this.notification = useService("notification");
         this.chatContainerRef = useRef("chatContainer");
         onMounted(() => {
             this.state.messages.push({
@@ -66,7 +64,6 @@ class AIAgentWidget extends Component {
 
         } catch (error) {
             const errorMessage = "Error: " + error.message;
-            this.notification.add(errorMessage, { type: "danger" });
             this.state.messages.push({ content: errorMessage, isUser: false });
             console.error("Error:", error);
         } finally {
