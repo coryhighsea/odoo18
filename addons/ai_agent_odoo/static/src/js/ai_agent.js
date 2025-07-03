@@ -41,20 +41,24 @@ class AIAgentSystray extends Component {
                 content: message
             });
 
-            // Use rpc to get the configuration from the Odoo backend.
+            // 1. Get config and credentials from backend
             const config = await rpc("/ai_agent_odoo/get_config", {});
-            if (!config || !config.ai_agent_url || !config.ai_agent_api_key) {
-                throw new Error("AI Agent URL is not configured in Odoo's System Parameters.");
+            if (!config || !config.ai_agent_url || !config.ai_agent_api_key || !config.odoo_credentials) {
+                throw new Error("AI Agent URL or Odoo credentials are not configured.");
             }
 
-            // Make the call to your Python AI service
-            const response = await fetch(`${config.ai_agent_url}/chat`, {
+            // 2. Prepare the payload for the new endpoint
+            const payload = {
+                odoo_credentials: config.odoo_credentials, // { url, db, username, password }
+                prompt: message,
+                conversation_history: conversationHistory,
+            };
+
+            // 3. Call the new endpoint
+            const response = await fetch(`${config.ai_agent_url}/api/v1/agent/invoke`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "api-Key": config.ai_agent_api_key },
-                body: JSON.stringify({
-                    message: message,
-                    conversation_history: conversationHistory,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
