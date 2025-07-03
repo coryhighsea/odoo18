@@ -132,8 +132,8 @@ class AIAgentSystray extends Component {
                 content: data.response
             }]);
 
-            // Scroll to bottom of chat
-            this.scrollToBottom();
+            // Scroll to bottom of chat after DOM update
+            setTimeout(() => this.scrollToBottom(), 0);
         } catch (error) {
             const errorMessage = "Error: " + error.message;
             this.state.messages.push({ content: errorMessage, isUser: false, isHtml: false });
