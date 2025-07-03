@@ -4,7 +4,7 @@ import { registry } from "@web/core/registry";
 import { Component, useState, onMounted, useRef } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 
-class AIAgentWidget extends Component {
+class AIAgentSystray extends Component {
     setup() {
         this.state = useState({
             messages: [],
@@ -97,9 +97,9 @@ class AIAgentWidget extends Component {
     }
 }
 
-AIAgentWidget.template = "ai_agent.AIAgentSystray";
+AIAgentSystray.template = "ai_agent.AIAgentSystray";
 
 // Register the widget as a main component (floating widget on all pages)
-registry.category("main_components").add("ai_agent.AIAgentWidget", {
+registry.category("systray").add("ai_agent.AIAgentWidget", {
     Component: AIAgentWidget,
 });
