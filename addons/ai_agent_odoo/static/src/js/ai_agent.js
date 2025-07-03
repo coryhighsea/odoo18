@@ -80,7 +80,7 @@ class AIAgentSystray extends Component {
             const response = await fetch(`${config.ai_agent_url}/api/v1/agent/invoke`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "api-Key": config.ai_agent_api_key },
-                body: JSON.stringify({payload}),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
