@@ -169,6 +169,7 @@ class AIAgentSystray extends Component {
 
 AIAgentSystray.template = "ai_agent_odoo.AIAgentSystray";
 AIAgentSystray.props = {};
+AIAgentSystray.components = { PasswordModal };
 
 // Add the widget to the systray
 registry.category("systray").add("ai_agent_odoo.AIAgentSystray", {
