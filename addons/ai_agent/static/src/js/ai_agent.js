@@ -3,6 +3,8 @@
 import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
 import { Component, useState, onMounted } from "@odoo/owl";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 class AIAgentSystray extends Component {
     setup() {
@@ -24,7 +26,7 @@ class AIAgentSystray extends Component {
         if (!this.state.inputMessage.trim() || this.state.isLoading) return;
 
         const message = this.state.inputMessage;
-        this.state.messages.push({ content: message, isUser: true });
+        this.state.messages.push({ content: message, isUser: true, isHtml: false });
         this.state.inputMessage = "";
         this.state.isLoading = true;
 
@@ -64,8 +66,9 @@ class AIAgentSystray extends Component {
 
             const data = await response.json();
 
-            // Add AI response to messages and history
-            this.state.messages.push({ content: data.response, isUser: false });
+            // Render AI response as Markdown, sanitize, and store as HTML
+            const html = DOMPurify.sanitize(marked.parse(data.response));
+            this.state.messages.push({ content: html, isUser: false, isHtml: true });
             this.state.conversationHistory = conversationHistory.concat([{
                 role: "assistant",
                 content: data.response
@@ -75,7 +78,7 @@ class AIAgentSystray extends Component {
             this.scrollToBottom();
         } catch (error) {
             const errorMessage = "Error: " + error.message;
-            this.state.messages.push({ content: errorMessage, isUser: false });
+            this.state.messages.push({ content: errorMessage, isUser: false, isHtml: false });
             console.error("Error:", error);
         } finally {
             this.state.isLoading = false;
