@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
-import { Component, useState, onMounted, nextTick } from "@odoo/owl";
+import { Component, useState, onMounted} from "@odoo/owl";
 
 // Password modal component
 export class PasswordModal extends Component {
@@ -133,7 +133,7 @@ class AIAgentSystray extends Component {
             }]);
 
             // Scroll to bottom of chat after DOM update
-            await nextTick(() => this.scrollToBottom());
+            setTimeout(() => this.scrollToBottom(), 0);
         } catch (error) {
             const errorMessage = "Error: " + error.message;
             this.state.messages.push({ content: errorMessage, isUser: false, isHtml: false });
