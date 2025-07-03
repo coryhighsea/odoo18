@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { useService } from "@web/core/utils/hooks";
+import { rpc } from "@web/core/network/rpc";
 import { Component, useState, onMounted } from "@odoo/owl";
 
 class AIAgentForm extends Component {
@@ -13,7 +13,6 @@ class AIAgentForm extends Component {
             isLoading: false,
             conversationHistory: []
         });
-        this.rpc = useService("rpc");
         this.notification = useService("notification");
         
         onMounted(() => {
@@ -69,7 +68,7 @@ class AIAgentForm extends Component {
                     const operation = JSON.parse(operationStr);
                     
                     // Execute the operation through Odoo's RPC
-                    await this.rpc(`/web/dataset/call_kw/${operation.model}/${operation.method}`, {
+                    await rpc(`/web/dataset/call_kw/${operation.model}/${operation.method}`, {
                         model: operation.model,
                         method: operation.method,
                         args: operation.args,
@@ -133,7 +132,7 @@ class AIAgentForm extends Component {
         
         try {
             const values = JSON.parse(valuesMatch[1]);
-            await this.rpc(`/web/dataset/call_kw/${model}/write`, {
+            await rpc(`/web/dataset/call_kw/${model}/write`, {
                 model: model,
                 method: 'write',
                 args: [[parseInt(values.id)], values],
