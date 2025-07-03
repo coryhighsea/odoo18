@@ -13,7 +13,6 @@ class AIAgentForm extends Component {
             isLoading: false,
             conversationHistory: []
         });
-        this.notification = useService("notification");
         
         onMounted(() => {
             if (this.state.isOpen) {
@@ -76,7 +75,6 @@ class AIAgentForm extends Component {
                     });
                     
                     // Show success notification
-                    this.notification.add("Operation completed successfully", { type: "success" });
                     
                     // Trigger a reload of the current view to reflect changes
                     this.env.services.action.doAction({
@@ -85,7 +83,6 @@ class AIAgentForm extends Component {
                     });
                 } catch (error) {
                     console.error("Error executing database operation:", error);
-                    this.notification.add("Error executing operation: " + error.message, { type: "danger" });
                 }
             }
             
@@ -99,7 +96,6 @@ class AIAgentForm extends Component {
             // Scroll to bottom of chat
             this.scrollToBottom();
         } catch (error) {
-            this.notification.add("Error sending message: " + error.message, { type: "danger" });
             console.error("Error:", error);
         } finally {
             this.state.isLoading = false;
