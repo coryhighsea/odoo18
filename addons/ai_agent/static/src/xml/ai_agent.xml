@@ -14,7 +14,7 @@
                     <t t-foreach="state.messages" t-as="message" t-key="message_index">
                         <div t-attf-class="o_message #{message.isUser ? 'o_user_message' : 'o_ai_message'}">
                             <div class="o_message_content">
-                                <t t-if="message.isHtml" t-raw="message.content"/>
+                                <t t-if="message.isHtml" t-out="message.content"/>
                                 <t t-if="!message.isHtml" t-esc="message.content"/>
                             </div>
                         </div>
