@@ -4,6 +4,23 @@ import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
 import { Component, useState, onMounted } from "@odoo/owl";
 
+export class PasswordModal extends Component {
+    setup() {
+        this.state = useState({ password: "" });
+    }
+    onInput(ev) {
+        this.state.password = ev.target.value;
+    }
+    onOk() {
+        this.props.onSubmit(this.state.password);
+    }
+    onCancel() {
+        this.props.onCancel();
+    }
+}
+PasswordModal.template = "ai_agent.PasswordModal";
+PasswordModal.props = ["onSubmit", "onCancel"];
+
 class AIAgentSystray extends Component {
     setup() {
         this.state = useState({
@@ -13,6 +30,8 @@ class AIAgentSystray extends Component {
             isLoading: false,
             conversationHistory: [],
             odooPassword: null,
+            showPasswordModal: false,
+            passwordPromise: null,
         });
         onMounted(() => {
             if (this.state.isOpen) {
@@ -22,13 +41,10 @@ class AIAgentSystray extends Component {
     }
 
     async promptForPassword() {
-        // Use a simple prompt for now; you can replace with a modal for better UX
-        const password = window.prompt("Enter your Odoo password (will not be saved):");
-        if (password) {
-            this.state.odooPassword = password;
-            return password;
-        }
-        throw new Error("Password is required to use the AI agent.");
+        this.state.showPasswordModal = true;
+        return new Promise((resolve, reject) => {
+            this.state.passwordPromise = { resolve, reject };
+        });
     }
 
     async sendMessage() {
@@ -130,6 +146,23 @@ class AIAgentSystray extends Component {
         if (this.state.isOpen) {
             // Use setTimeout to ensure the DOM is updated before scrolling
             setTimeout(() => this.scrollToBottom(), 0);
+        }
+    }
+
+    onPasswordSubmit(password) {
+        this.state.odooPassword = password;
+        this.state.showPasswordModal = false;
+        if (this.state.passwordPromise) {
+            this.state.passwordPromise.resolve(password);
+            this.state.passwordPromise = null;
+        }
+    }
+
+    onPasswordCancel() {
+        this.state.showPasswordModal = false;
+        if (this.state.passwordPromise) {
+            this.state.passwordPromise.reject(new Error("Password is required to use the AI agent."));
+            this.state.passwordPromise = null;
         }
     }
 }

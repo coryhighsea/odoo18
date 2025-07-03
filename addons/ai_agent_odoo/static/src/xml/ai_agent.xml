@@ -40,4 +40,25 @@
             </div>
         </div>
     </t>
+    <t t-name="ai_agent.PasswordModal">
+        <div class="modal-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:2000;display:flex;align-items:center;justify-content:center;">
+            <div class="modal-content" style="background:white;padding:2em;border-radius:8px;min-width:300px;">
+                <h3>Enter your Odoo password</h3>
+                <input
+                    type="password"
+                    t-model="state.password"
+                    placeholder="Password"
+                    style="width:100%;padding:0.5em;margin:1em 0;"
+                    t-on-input="onInput"
+                />
+                <div style="display:flex;justify-content:flex-end;gap:1em;">
+                    <button t-on-click="onCancel" style="padding:0.5em 1em;">Cancel</button>
+                    <button t-on-click="onOk" style="padding:0.5em 1em;" t-att-disabled="!state.password">OK</button>
+                </div>
+            </div>
+        </div>
+    </t>
+    <t t-if="state.showPasswordModal">
+        <PasswordModal onSubmit.bind="onPasswordSubmit" onCancel.bind="onPasswordCancel"/>
+    </t>
 </templates>
