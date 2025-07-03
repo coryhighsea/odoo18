@@ -11,7 +11,8 @@ class AIAgentSystray extends Component {
             inputMessage: "",
             isOpen: false,
             isLoading: false,
-            conversationHistory: []
+            conversationHistory: [],
+            odooPassword: null,
         });
         onMounted(() => {
             if (this.state.isOpen) {
@@ -20,11 +21,21 @@ class AIAgentSystray extends Component {
         });
     }
 
+    async promptForPassword() {
+        // Use a simple prompt for now; you can replace with a modal for better UX
+        const password = window.prompt("Enter your Odoo password (will not be saved):");
+        if (password) {
+            this.state.odooPassword = password;
+            return password;
+        }
+        throw new Error("Password is required to use the AI agent.");
+    }
+
     async sendMessage() {
         if (!this.state.inputMessage.trim() || this.state.isLoading) return;
 
         const message = this.state.inputMessage;
-        this.state.messages.push({ content: message, isUser: true });
+        this.state.messages.push({ content: message, isUser: true, isHtml: false });
         this.state.inputMessage = "";
         this.state.isLoading = true;
 
@@ -43,18 +54,33 @@ class AIAgentSystray extends Component {
 
             // Use rpc to get the configuration from the Odoo backend.
             const config = await rpc("/ai_agent_odoo/get_config", {});
-            if (!config || !config.ai_agent_url || !config.ai_agent_api_key) {
-                throw new Error("AI Agent URL is not configured in Odoo's System Parameters.");
+            if (!config || !config.ai_agent_url || !config.ai_agent_api_key || !config.db || !config.login) {
+                throw new Error("AI Agent URL or Odoo Credentials are not configured in Odoo's System Parameters.");
             }
 
+            // Prompt for password if not already set
+            let password = this.state.odooPassword;
+            if (!password) {
+                password = await this.promptForPassword();
+            }
+
+            // Compose the payload for the new endpoint
+            const payload = {
+                odoo_credentials: {
+                    url: window.location.origin, // Use current Odoo instance URL
+                    db: config.db,
+                    username: config.login,
+                    password: password,
+                },
+                prompt: message,
+                conversation_history: conversationHistory,
+            };
+
             // Make the call to your Python AI service
-            const response = await fetch(`${config.ai_agent_url}/chat`, {
+            const response = await fetch(`${config.ai_agent_url}/api/v1/agent/invoke`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "api-Key": config.ai_agent_api_key },
-                body: JSON.stringify({
-                    message: message,
-                    conversation_history: conversationHistory,
-                }),
+                body: JSON.stringify({payload}),
             });
 
             if (!response.ok) {
@@ -64,8 +90,9 @@ class AIAgentSystray extends Component {
 
             const data = await response.json();
 
-            // Add AI response to messages and history
-            this.state.messages.push({ content: data.response, isUser: false });
+            // RenderAI response to messages and history
+            const html = window.DOMPurify.sanitize(window.marked.parse(data.response));
+            this.state.messages.push({ content: html, isUser: false, isHtml: true });
             this.state.conversationHistory = conversationHistory.concat([{
                 role: "assistant",
                 content: data.response
@@ -75,7 +102,7 @@ class AIAgentSystray extends Component {
             this.scrollToBottom();
         } catch (error) {
             const errorMessage = "Error: " + error.message;
-            this.state.messages.push({ content: errorMessage, isUser: false });
+            this.state.messages.push({ content: errorMessage, isUser: false, isHtml: false });
             console.error("Error:", error);
         } finally {
             this.state.isLoading = false;
