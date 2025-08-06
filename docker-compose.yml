@@ -1,19 +1,17 @@
+version: '3.8'
+
 services:
   # PostgreSQL Database Service
   db:
     image: postgres:15
     container_name: odoo18-db
-    environment:
-      POSTGRES_USER: odoo
-      POSTGRES_PASSWORD: odoo
-      POSTGRES_DB: odoo
     volumes:
       - odoo-db-data:/var/lib/postgresql/data
     restart: always
 
   # Odoo 18 Application Service
   odoo:
-    image: odoo:18.0
+    build: .
     container_name: odoo18-app
     depends_on:
       - db
@@ -23,14 +21,9 @@ services:
 
     volumes:
       # Mounts a local folder for your custom addons
-      - ./addons:/mnt/extra-addons
+      # - ./addons:/mnt/extra-addons
       # Mounts a volume to persist Odoo's data (filestore)
       - odoo-web-data:/var/lib/odoo
-    environment:
-      HOST: db
-      USER: odoo
-      PASSWORD: odoo
-      PORT: 5432
     restart: always
 
 volumes:

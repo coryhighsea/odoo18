@@ -2,6 +2,8 @@
 import json
 import logging
 import os
+import threading
+import time
 from typing import List, Dict, Any, Optional
 
 try:
@@ -31,12 +33,17 @@ class OpenAIClient(models.TransientModel):
         api_key = self._get_openai_api_key()
         if api_key:
             if httpx is not None:
-                # Create client with explicit timeout and retry configuration for Docker environment
-                return OpenAI(
-                    api_key=api_key,
-                    timeout=httpx.Timeout(60.0, connect=60.0),
-                    max_retries=3
-                )
+                try:
+                    # Use the configuration that works in our tests
+                    return OpenAI(
+                        api_key=api_key,
+                        timeout=httpx.Timeout(60.0, connect=60.0),
+                        max_retries=3
+                    )
+                except Exception as e:
+                    _logger.warning(f"Failed to create httpx client: {e}")
+                    # Fallback to basic client
+                    return OpenAI(api_key=api_key)
             else:
                 # Fallback to basic client if httpx is not available
                 return OpenAI(api_key=api_key)
@@ -344,6 +351,55 @@ class OpenAIClient(models.TransientModel):
         else:
             return result.get("response", "I encountered an error processing your request.")
 
+    def _test_openai_threaded(self, api_key: str) -> Dict[str, Any]:
+        """
+        Test OpenAI connection in a separate thread to avoid web server blocking.
+        """
+        result = {"success": False, "error": None, "response": None}
+        
+        def run_test():
+            try:
+                client = OpenAI(
+                    api_key=api_key,
+                    timeout=httpx.Timeout(30.0, connect=30.0) if httpx else None,
+                    max_retries=2
+                )
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": "Say 'OK'"}],
+                    max_tokens=5,
+                    temperature=0
+                )
+                
+                result.update({
+                    "success": True,
+                    "response": response.choices[0].message.content.strip(),
+                    "config_used": "threaded"
+                })
+                
+            except Exception as e:
+                result.update({
+                    "success": False,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                })
+        
+        # Run in thread with timeout
+        thread = threading.Thread(target=run_test)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=45)  # 45 second timeout
+        
+        if thread.is_alive():
+            result.update({
+                "success": False,
+                "error": "Connection timeout",
+                "error_type": "TimeoutError"
+            })
+        
+        return result
+
     def test_openai_connection(self) -> Dict[str, Any]:
         """
         Test the OpenAI API connection with a simple ping.
@@ -368,37 +424,42 @@ class OpenAIClient(models.TransientModel):
                 "message": "OpenAI library not installed"
             }
         
-        # Try multiple client configurations
+        # First try the threaded approach (might work better in Odoo web context)
+        _logger.info("Trying threaded OpenAI connection test")
+        threaded_result = self._test_openai_threaded(api_key)
+        
+        if threaded_result.get("success"):
+            return {
+                "success": True,
+                "message": "OpenAI connection successful (threaded)",
+                "response": threaded_result.get("response"),
+                "model_used": "gpt-4o-mini",
+                "api_key_preview": f"{api_key[:10]}..." if api_key else "None",
+                "config_used": "threaded"
+            }
+        
+        # If threaded approach failed, try the regular configurations
         clients_to_try = []
         
-        # Configuration 1: With httpx timeout (if available)
+        # Configuration 1: Basic httpx timeout (simplified)
         if httpx is not None:
             try:
                 clients_to_try.append((
-                    "httpx_timeout",
+                    "simple_httpx",
                     OpenAI(
                         api_key=api_key,
-                        timeout=httpx.Timeout(60.0, connect=60.0),
-                        max_retries=3
+                        timeout=httpx.Timeout(30.0, connect=30.0),
+                        max_retries=1
                     )
                 ))
             except Exception as e:
-                _logger.warning(f"Failed to create httpx timeout client: {e}")
+                _logger.warning(f"Failed to create simple httpx client: {e}")
         
-        # Configuration 2: Basic client with just retries
-        try:
-            clients_to_try.append((
-                "basic_retries",
-                OpenAI(api_key=api_key, max_retries=3)
-            ))
-        except Exception as e:
-            _logger.warning(f"Failed to create basic retries client: {e}")
-        
-        # Configuration 3: Most basic client
+        # Configuration 2: Most basic client
         try:
             clients_to_try.append((
                 "basic",
-                OpenAI(api_key=api_key)
+                OpenAI(api_key=api_key, max_retries=1)
             ))
         except Exception as e:
             _logger.warning(f"Failed to create basic client: {e}")
@@ -407,7 +468,7 @@ class OpenAIClient(models.TransientModel):
             return {
                 "success": False,
                 "error": "Could not create any OpenAI client",
-                "message": "Failed to initialize OpenAI client with any configuration"
+                "message": f"Failed to initialize OpenAI client. Threaded error: {threaded_result.get('error', 'Unknown')}"
             }
 
         # Try each client configuration
@@ -418,17 +479,15 @@ class OpenAIClient(models.TransientModel):
                 
                 # Make a simple API call to test connection
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini",  # Use cheaper model for testing
-                    messages=[
-                        {"role": "user", "content": "Hello, respond with just 'Connection successful'"}
-                    ],
-                    max_tokens=10,
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": "Say 'OK'"}],
+                    max_tokens=5,
                     temperature=0
                 )
                 
                 return {
                     "success": True,
-                    "message": f"OpenAI connection successful with {config_name} configuration",
+                    "message": f"OpenAI connection successful with {config_name}",
                     "response": response.choices[0].message.content.strip(),
                     "model_used": "gpt-4o-mini",
                     "api_key_preview": f"{api_key[:10]}..." if api_key else "None",
@@ -445,8 +504,9 @@ class OpenAIClient(models.TransientModel):
         return {
             "success": False,
             "error": str(last_error),
-            "message": f"OpenAI API connection failed with all configurations: {str(last_error)}",
+            "message": f"All OpenAI configurations failed. Threaded: {threaded_result.get('error')}, Last: {str(last_error)}",
             "api_key_preview": f"{api_key[:10]}..." if api_key else "None",
             "error_type": type(last_error).__name__ if last_error else "Unknown",
-            "configs_tried": [name for name, _ in clients_to_try]
+            "configs_tried": [name for name, _ in clients_to_try],
+            "threaded_error": threaded_result.get("error")
         }
