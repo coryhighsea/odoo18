@@ -1,0 +1,2 @@
+# AI Agent Odoo Requirements
+openai>=1.0.0

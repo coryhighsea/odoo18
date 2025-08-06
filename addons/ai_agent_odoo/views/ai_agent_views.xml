@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- AI Agent Form View -->
+        <record id="view_ai_agent_form" model="ir.ui.view">
+            <field name="name">ai.agent.form</field>
+            <field name="model">ai.agent</field>
+            <field name="arch" type="xml">
+                <form string="AI Agent Configuration">
+                    <sheet>
+                        <group>
+                            <field name="name"/>
+                            <field name="active"/>
+                            <field name="model_provider"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- AI Agent Tree View -->
+        <record id="view_ai_agent_tree" model="ir.ui.view">
+            <field name="name">ai.agent.tree</field>
+            <field name="model">ai.agent</field>
+            <field name="arch" type="xml">
+                <tree string="AI Agents">
+                    <field name="name"/>
+                    <field name="model_provider"/>
+                    <field name="active"/>
+                </tree>
+            </field>
+        </record>
+
+        <!-- AI Agent Action -->
+        <record id="action_ai_agent" model="ir.actions.act_window">
+            <field name="name">AI Agents</field>
+            <field name="res_model">ai.agent</field>
+            <field name="view_mode">tree,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Configure your AI agents here
+                </p>
+                <p>
+                    Set up and manage AI assistants that can help users with various Odoo operations.
+                </p>
+            </field>
+        </record>
+
+        <!-- Menu -->
+        <menuitem
+            id="menu_ai_agent_root"
+            name="AI Assistant"
+            sequence="100"/>
+
+        <menuitem
+            id="menu_ai_agent_config"
+            name="Configuration"
+            parent="menu_ai_agent_root"
+            action="action_ai_agent"
+            sequence="10"/>
+    </data>
+</odoo>

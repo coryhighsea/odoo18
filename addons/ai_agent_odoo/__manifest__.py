@@ -10,7 +10,13 @@
     'license': 'LGPL-3',
     'author': 'Cory Hisey',
     'website': 'https://coryhisey.com',
-    'depends': ['web', 'mail'],  # 'base' is included with 'web', so it's not strictly needed here
+    'depends': ['web', 'mail', 'sale', 'crm', 'stock', 'product'],  # Added modules for Odoo tools integration
+
+    'data': [
+        'security/ir.model.access.csv',
+        'data/ai_agent_data.xml',
+        'views/ai_agent_views.xml',
+    ],
 
     'assets': {
         'web.assets_backend': [
