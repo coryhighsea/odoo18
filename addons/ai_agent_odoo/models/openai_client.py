@@ -6,8 +6,10 @@ from typing import List, Dict, Any, Optional
 
 try:
     from openai import OpenAI
+    import httpx
 except ImportError:
     OpenAI = None
+    httpx = None
 
 from odoo import api, models, fields
 from odoo.exceptions import UserError, ValidationError
@@ -28,7 +30,16 @@ class OpenAIClient(models.TransientModel):
         
         api_key = self._get_openai_api_key()
         if api_key:
-            return OpenAI(api_key=api_key)
+            if httpx is not None:
+                # Create client with explicit timeout and retry configuration for Docker environment
+                return OpenAI(
+                    api_key=api_key,
+                    timeout=httpx.Timeout(60.0, connect=60.0),
+                    max_retries=3
+                )
+            else:
+                # Fallback to basic client if httpx is not available
+                return OpenAI(api_key=api_key)
         else:
             _logger.warning("OpenAI API key not configured")
             return None
@@ -332,3 +343,110 @@ class OpenAIClient(models.TransientModel):
             return result.get("response", "I apologize, but I couldn't generate a response.")
         else:
             return result.get("response", "I encountered an error processing your request.")
+
+    def test_openai_connection(self) -> Dict[str, Any]:
+        """
+        Test the OpenAI API connection with a simple ping.
+        
+        Returns:
+            Dictionary with connection test results
+        """
+        # Debug: Check API key
+        api_key = self._get_openai_api_key()
+        if not api_key:
+            return {
+                "success": False,
+                "error": "No API key configured",
+                "message": "API key not configured in system parameters"
+            }
+        
+        # Debug: Check OpenAI library
+        if OpenAI is None:
+            return {
+                "success": False,
+                "error": "OpenAI library not available",
+                "message": "OpenAI library not installed"
+            }
+        
+        # Try multiple client configurations
+        clients_to_try = []
+        
+        # Configuration 1: With httpx timeout (if available)
+        if httpx is not None:
+            try:
+                clients_to_try.append((
+                    "httpx_timeout",
+                    OpenAI(
+                        api_key=api_key,
+                        timeout=httpx.Timeout(60.0, connect=60.0),
+                        max_retries=3
+                    )
+                ))
+            except Exception as e:
+                _logger.warning(f"Failed to create httpx timeout client: {e}")
+        
+        # Configuration 2: Basic client with just retries
+        try:
+            clients_to_try.append((
+                "basic_retries",
+                OpenAI(api_key=api_key, max_retries=3)
+            ))
+        except Exception as e:
+            _logger.warning(f"Failed to create basic retries client: {e}")
+        
+        # Configuration 3: Most basic client
+        try:
+            clients_to_try.append((
+                "basic",
+                OpenAI(api_key=api_key)
+            ))
+        except Exception as e:
+            _logger.warning(f"Failed to create basic client: {e}")
+        
+        if not clients_to_try:
+            return {
+                "success": False,
+                "error": "Could not create any OpenAI client",
+                "message": "Failed to initialize OpenAI client with any configuration"
+            }
+
+        # Try each client configuration
+        last_error = None
+        for config_name, client in clients_to_try:
+            try:
+                _logger.info(f"Trying OpenAI connection with {config_name} configuration")
+                
+                # Make a simple API call to test connection
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",  # Use cheaper model for testing
+                    messages=[
+                        {"role": "user", "content": "Hello, respond with just 'Connection successful'"}
+                    ],
+                    max_tokens=10,
+                    temperature=0
+                )
+                
+                return {
+                    "success": True,
+                    "message": f"OpenAI connection successful with {config_name} configuration",
+                    "response": response.choices[0].message.content.strip(),
+                    "model_used": "gpt-4o-mini",
+                    "api_key_preview": f"{api_key[:10]}..." if api_key else "None",
+                    "config_used": config_name
+                }
+                
+            except Exception as e:
+                last_error = e
+                _logger.warning(f"OpenAI connection failed with {config_name}: {e}")
+                continue
+        
+        # If we get here, all configurations failed
+        _logger.error(f"All OpenAI client configurations failed. Last error: {last_error}")
+        return {
+            "success": False,
+            "error": str(last_error),
+            "message": f"OpenAI API connection failed with all configurations: {str(last_error)}",
+            "api_key_preview": f"{api_key[:10]}..." if api_key else "None",
+            "error_type": type(last_error).__name__ if last_error else "Unknown",
+            "configs_tried": [name for name, _ in clients_to_try]
+        }

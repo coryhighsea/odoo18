@@ -16,8 +16,6 @@ class AIAgentController(http.Controller):
         The URL is stored in Odoo's System Parameters for easy configuration.
         """
         get_param = request.env['ir.config_parameter'].sudo().get_param
-        ai_agent_url = get_param('ai_agent_odoo.service_url')
-        ai_agent_api_key = get_param('ai_agent_odoo.api_key')
         openai_api_key = get_param('ai_agent_odoo.openai_api_key')
         
         # Get AI agent configuration
@@ -30,8 +28,6 @@ class AIAgentController(http.Controller):
         db = request.session.db
         login = request.session.login
         return {
-            'ai_agent_url': ai_agent_url,
-            'ai_agent_api_key': ai_agent_api_key,
             'openai_configured': bool(openai_api_key),
             'ai_config': config,
             'db': db,
@@ -85,31 +81,14 @@ class AIAgentController(http.Controller):
     def test_connection(self):
         """Test the AI service connection."""
         try:
-            # Check if OpenAI is configured
-            get_param = request.env['ir.config_parameter'].sudo().get_param
-            openai_api_key = get_param('ai_agent_odoo.openai_api_key')
-            
-            if not openai_api_key:
-                return {
-                    'success': False,
-                    'message': 'OpenAI API key not configured'
-                }
-            
-            # Try a simple test with the AI agent
-            ai_agent = request.env['ai.agent'].search([('active', '=', True)], limit=1)
-            if not ai_agent:
-                return {
-                    'success': False,
-                    'message': 'No active AI agent found'
-                }
-            
-            # Test with a simple message
-            test_response = ai_agent.process_user_message("Hello, this is a connection test.")
+            # Test OpenAI connection directly
+            openai_client = request.env['ai.agent.openai.client']
+            test_result = openai_client.test_openai_connection()
             
             return {
-                'success': test_response.get('success', False),
-                'message': 'Connection test completed',
-                'test_response': test_response.get('message', 'No response')
+                'success': test_result.get('success', False),
+                'message': test_result.get('message', 'Connection test completed'),
+                'details': test_result
             }
             
         except Exception as e:
