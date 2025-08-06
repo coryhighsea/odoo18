@@ -5,9 +5,9 @@ FROM odoo:18.0
 USER root
 
 # Update package list and install any system dependencies if needed
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y \
+#     python3-pip \
+#     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better Docker layer caching
 COPY ./addons/ai_agent_odoo/requirements.txt /tmp/requirements.txt
