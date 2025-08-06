@@ -7,21 +7,5 @@
             <field name="active">True</field>
             <field name="model_provider">openai</field>
         </record>
-
-        <!-- System Parameters for AI Agent Configuration -->
-        <record id="openai_api_key_param" model="ir.config_parameter">
-            <field name="key">ai_agent_odoo.openai_api_key</field>
-            <field name="value"></field>
-        </record>
-
-        <record id="service_url_param" model="ir.config_parameter">
-            <field name="key">ai_agent_odoo.service_url</field>
-            <field name="value">http://localhost:8001</field>
-        </record>
-
-        <record id="api_key_param" model="ir.config_parameter">
-            <field name="key">ai_agent_odoo.api_key</field>
-            <field name="value"></field>
-        </record>
     </data>
 </odoo>

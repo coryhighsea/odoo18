@@ -19,18 +19,19 @@ class OpenAIClient(models.TransientModel):
     _name = 'ai.agent.openai.client'
     _description = 'OpenAI Client for AI Agent'
 
-    def __init__(self, pool, cr):
-        super().__init__(pool, cr)
+    @api.model
+    def _get_openai_client(self):
+        """Get OpenAI client instance."""
         if OpenAI is None:
             _logger.warning("OpenAI library not installed. Please install it with: pip install openai")
-            self._client = None
+            return None
+        
+        api_key = self._get_openai_api_key()
+        if api_key:
+            return OpenAI(api_key=api_key)
         else:
-            api_key = self._get_openai_api_key()
-            if api_key:
-                self._client = OpenAI(api_key=api_key)
-            else:
-                _logger.warning("OpenAI API key not configured")
-                self._client = None
+            _logger.warning("OpenAI API key not configured")
+            return None
 
     def _get_openai_api_key(self):
         """Get OpenAI API key from system parameters."""
@@ -181,7 +182,8 @@ class OpenAIClient(models.TransientModel):
         Returns:
             Dictionary containing the response and any tool calls made
         """
-        if not self._client:
+        client = self._get_openai_client()
+        if not client:
             return {
                 "error": "OpenAI client not initialized. Please check your API key configuration.",
                 "response": "I'm sorry, but I'm unable to connect to the AI service. Please contact your administrator."
@@ -193,7 +195,7 @@ class OpenAIClient(models.TransientModel):
             
             for iteration in range(max_iterations):
                 # Make the API call
-                response = self._client.chat.completions.create(
+                response = client.chat.completions.create(
                     model="gpt-4-1106-preview",  # Use GPT-4 Turbo for better tool handling
                     messages=messages,
                     tools=tools,
@@ -268,7 +270,7 @@ class OpenAIClient(models.TransientModel):
                         })
             
             # If we've reached max iterations, make a final call for the response
-            final_response = self._client.chat.completions.create(
+            final_response = client.chat.completions.create(
                 model="gpt-4-1106-preview",
                 messages=messages,
                 temperature=0.1

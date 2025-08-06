@@ -71,6 +71,9 @@ class AIAgent(models.Model):
     @api.model
     def get_configuration(self):
         """Get AI agent configuration for frontend."""
+        # Initialize system parameters if they don't exist
+        self._ensure_system_parameters()
+        
         return {
             'active': True,
             'provider': 'openai',
@@ -82,3 +85,20 @@ class AIAgent(models.Model):
                 'Inventory Operations'
             ]
         }
+
+    @api.model
+    def _ensure_system_parameters(self):
+        """Ensure required system parameters exist."""
+        params_to_check = [
+            ('ai_agent_odoo.openai_api_key', ''),
+            ('ai_agent_odoo.service_url', 'http://localhost:8001'),
+            ('ai_agent_odoo.api_key', ''),
+        ]
+        
+        for key, default_value in params_to_check:
+            existing = self.env['ir.config_parameter'].search([('key', '=', key)])
+            if not existing:
+                self.env['ir.config_parameter'].sudo().create({
+                    'key': key,
+                    'value': default_value
+                })
