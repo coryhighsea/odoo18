@@ -271,7 +271,7 @@ class OpenAIClient(models.TransientModel):
             
             # If we've reached max iterations, make a final call for the response
             final_response = client.chat.completions.create(
-                model="gpt-4-1106-preview",
+                model="gpt-4o-mini",
                 messages=messages,
                 temperature=0.1
             )
