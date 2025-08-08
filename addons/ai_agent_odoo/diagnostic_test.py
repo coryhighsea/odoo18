@@ -356,10 +356,12 @@ def main():
     api_key = None
     if len(sys.argv) > 1:
         api_key = sys.argv[1]
-    else:
-        api_key = input("Enter OpenAI API key (or press Enter to skip model testing): ").strip()
-        if not api_key:
+        if api_key == "":
             api_key = None
+    else:
+        # Non-interactive mode - skip API key input
+        print("Running in non-interactive mode - skipping API key input")
+        api_key = None
     
     # Run diagnosis
     results = run_comprehensive_diagnosis(api_key)
@@ -377,3 +379,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
