@@ -1,0 +1,51 @@
+{
+  "timestamp": "2025-08-08 04:40:29.161743",
+  "dependencies": {
+    "openai": {
+      "installed": true,
+      "version": "1.82.1",
+      "error": null
+    },
+    "httpx": {
+      "installed": true,
+      "version": "0.28.1",
+      "error": null
+    }
+  },
+  "network": {
+    "success": true,
+    "status_code": "Available",
+    "response": "HTTP/2 421 \ndate: Fri, 08 Aug 2025 04:40:29 GMT\ncontent-type: application/json\ncontent-length: 124\nset-cookie: __cf_bm=k.ujgALKdzZk4hbn5Ib3DyPcMwASmA5ugOjSEfwLDuA-1754628029-1.0.1.1-n7HSem1.RujruXapAb"
+  },
+  "client_creation": {
+    "success": true,
+    "configs_tested": [
+      {
+        "name": "basic",
+        "success": true
+      },
+      {
+        "name": "httpx_timeout",
+        "success": true
+      },
+      {
+        "name": "minimal",
+        "success": true
+      }
+    ],
+    "successful_configs": 3,
+    "total_configs": 3
+  },
+  "api_key_validation": {
+    "valid": false,
+    "error": "API key is empty or None",
+    "suggestions": [
+      "Set the API key in Odoo System Parameters"
+    ]
+  },
+  "model_access": {
+    "success": false,
+    "message": "Skipped - no valid API key provided"
+  },
+  "overall_status": "setup_ok_need_api_key"
+}
