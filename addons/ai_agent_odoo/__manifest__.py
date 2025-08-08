@@ -25,7 +25,7 @@
             'ai_agent_odoo/static/src/js/ai_agent.js',
             'ai_agent_odoo/static/src/xml/ai_agent.xml',
             'ai_agent_odoo/static/src/js/lib/marked.min.js',
-            'ai_agent_odoo/static/src/js/lib/dompurify.min,js',
+            'ai_agent_odoo/static/src/js/lib/dompurify.min.js',
         ],
     },
     'images': ['static/images/thumbnail.png'],
@@ -33,3 +33,4 @@
     'application': True,
     'auto_install': False,
 }
+

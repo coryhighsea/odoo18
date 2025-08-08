@@ -214,7 +214,7 @@ class OpenAIClient(models.TransientModel):
             for iteration in range(max_iterations):
                 # Make the API call
                 response = client.chat.completions.create(
-                    model="gpt-4-1106-preview",  # Use GPT-4 Turbo for better tool handling
+                    model="gpt-4o-mini",  # Use GPT-4o-mini for better compatibility and cost efficiency
                     messages=messages,
                     tools=tools,
                     tool_choice="auto",
@@ -510,3 +510,4 @@ class OpenAIClient(models.TransientModel):
             "configs_tried": [name for name, _ in clients_to_try],
             "threaded_error": threaded_result.get("error")
         }
+
