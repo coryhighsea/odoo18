@@ -64,9 +64,40 @@ Your AI Agent Odoo addon has been successfully implemented and the Docker enviro
 - **OpenAI Model**: GPT-4 Turbo (gpt-4-1106-preview)
 
 ### System Parameters
-- `ai_agent_odoo.openai_api_key` - Your OpenAI API key
-- `ai_agent_odoo.service_url` - External service URL (optional)
-- `ai_agent_odoo.api_key` - External service API key (optional)
+- `ai_agent_odoo.openai_api_key` - Your OpenAI API key (for direct OpenAI integration)
+- `ai_agent_odoo.service_url` - External service URL (for legacy service integration)
+- `ai_agent_odoo.api_key` - External service API key (authentication for legacy service)
+
+## 🔄 AI Service Integration Methods
+
+### 1. **Direct OpenAI Integration** (Recommended)
+Configure `ai_agent_odoo.openai_api_key` with your OpenAI API key. The system will use OpenAI's API directly for AI responses with full tool calling capabilities.
+
+### 2. **Legacy Service Integration** (Fallback/Alternative)
+Configure `ai_agent_odoo.service_url` to point to your external AI service endpoint. The system will:
+- Send HTTP POST requests to `{service_url}/ai/chat`
+- Include current Odoo session credentials in the payload:
+  ```json
+  {
+    "message": "user message",
+    "conversation_history": [...],
+    "odoo_credentials": {
+      "database": "database_name", 
+      "login": "user_login",
+      "uid": 123,
+      "user_name": "User Name",
+      "company_id": 1,
+      "company_name": "Company Name"
+    },
+    "timestamp": 1234567890
+  }
+  ```
+- Include `Authorization: Bearer {api_key}` header if `ai_agent_odoo.api_key` is configured
+
+### 3. **Hybrid Mode** (Automatic Fallback)
+Configure both methods for maximum reliability:
+- Primary: Uses OpenAI direct integration when available
+- Fallback: Uses legacy service if OpenAI fails or is not configured
 
 ## 🛠️ Development Commands
 

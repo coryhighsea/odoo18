@@ -17,6 +17,8 @@ class AIAgentController(http.Controller):
         """
         get_param = request.env['ir.config_parameter'].sudo().get_param
         openai_api_key = get_param('ai_agent_odoo.openai_api_key')
+        service_url = get_param('ai_agent_odoo.service_url', 'http://localhost:8001')
+        legacy_api_key = get_param('ai_agent_odoo.api_key')
         
         # Get AI agent configuration
         ai_agent = request.env['ai.agent'].search([], limit=1)
@@ -29,6 +31,9 @@ class AIAgentController(http.Controller):
         login = request.session.login
         return {
             'openai_configured': bool(openai_api_key),
+            'legacy_service_configured': bool(service_url and service_url != 'http://localhost:8001'),
+            'legacy_api_key_configured': bool(legacy_api_key),
+            'service_url': service_url,
             'ai_config': config,
             'db': db,
             'login': login,
@@ -79,16 +84,19 @@ class AIAgentController(http.Controller):
 
     @http.route('/ai_agent_odoo/test_connection', type='json', auth='user')
     def test_connection(self):
-        """Test the AI service connection."""
+        """Test the AI service connections (OpenAI and legacy service)."""
         try:
-            # Test OpenAI connection directly
+            # Test both OpenAI and legacy service connections
             openai_client = request.env['ai.agent.openai.client']
             test_result = openai_client.test_openai_connection()
             
             return {
                 'success': test_result.get('success', False),
                 'message': test_result.get('message', 'Connection test completed'),
-                'details': test_result
+                'details': test_result,
+                'available_methods': test_result.get('available_methods', []),
+                'openai': test_result.get('openai', {}),
+                'legacy_service': test_result.get('legacy_service', {})
             }
             
         except Exception as e:

@@ -1,4 +1,14 @@
-# System Parameters Configuration Guide
+# System Param### 2. Service URL (Legacy Integration)
+- **Parameter Key**: `ai_agent_odoo.service_url`
+- **Description**: URL for external AI service endpoint. The system will send POST requests to `{service_url}/ai/chat` with Odoo credentials and user messages.
+- **Default**: `http://localhost:8001`
+- **Example**: `https://your-ai-service.com` or `http://192.168.1.100:8080`
+
+### 3. API Key (Legacy Authentication)
+- **Parameter Key**: `ai_agent_odoo.api_key`
+- **Description**: API key for authenticating with external legacy service. Sent as `Authorization: Bearer {api_key}` header.
+- **Default**: Empty string
+- **Example**: `your-service-api-key-12345`figuration Guide
 
 This guide explains how to properly configure the OpenAI API key and other system parameters for the AI Agent Odoo chatbot.
 

@@ -9,9 +9,11 @@ from typing import List, Dict, Any, Optional
 try:
     from openai import OpenAI
     import httpx
+    import requests
 except ImportError:
     OpenAI = None
     httpx = None
+    requests = None
 
 from odoo import api, models, fields
 from odoo.exceptions import UserError, ValidationError
@@ -54,6 +56,26 @@ class OpenAIClient(models.TransientModel):
     def _get_openai_api_key(self):
         """Get OpenAI API key from system parameters."""
         return self.env['ir.config_parameter'].sudo().get_param('ai_agent_odoo.openai_api_key')
+
+    def _get_service_url(self):
+        """Get external service URL from system parameters."""
+        return self.env['ir.config_parameter'].sudo().get_param('ai_agent_odoo.service_url', 'http://localhost:8001')
+
+    def _get_legacy_api_key(self):
+        """Get legacy API key from system parameters."""
+        return self.env['ir.config_parameter'].sudo().get_param('ai_agent_odoo.api_key')
+
+    def _get_odoo_credentials(self):
+        """Get current Odoo session credentials for legacy service."""
+        return {
+            'database': self.env.cr.dbname,
+            'login': self.env.user.login,
+            'uid': self.env.uid,
+            'session_id': self.env.context.get('session_id'),
+            'user_name': self.env.user.name,
+            'company_id': self.env.company.id,
+            'company_name': self.env.company.name,
+        }
 
     def _get_available_tools(self):
         """Get the list of available Odoo tools for OpenAI."""
@@ -189,6 +211,117 @@ class OpenAIClient(models.TransientModel):
             _logger.error(f"Error executing tool {tool_name}: {e}")
             return {"error": str(e)}
 
+    def _send_legacy_service_request(self, user_message: str, conversation_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
+        """
+        Send request to external legacy service with Odoo credentials.
+        
+        Args:
+            user_message: The user's message
+            conversation_history: Optional previous conversation history
+            
+        Returns:
+            Dictionary with service response or error
+        """
+        service_url = self._get_service_url()
+        legacy_api_key = self._get_legacy_api_key()
+        
+        if not service_url:
+            return {
+                "success": False,
+                "error": "Service URL not configured",
+                "response": "Legacy service URL is not configured."
+            }
+        
+        try:
+            # Prepare the payload
+            payload = {
+                "message": user_message,
+                "conversation_history": conversation_history or [],
+                "odoo_credentials": self._get_odoo_credentials(),
+                "timestamp": time.time()
+            }
+            
+            # Add legacy API key to headers if configured
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "Odoo-AI-Agent/1.0"
+            }
+            
+            if legacy_api_key:
+                headers["Authorization"] = f"Bearer {legacy_api_key}"
+                headers["X-API-Key"] = legacy_api_key
+            
+            # Make the HTTP request
+            if httpx is not None:
+                try:
+                    with httpx.Client(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
+                        response = client.post(
+                            f"{service_url.rstrip('/')}/ai/chat",
+                            json=payload,
+                            headers=headers
+                        )
+                        response.raise_for_status()
+                        
+                        response_data = response.json()
+                        return {
+                            "success": True,
+                            "response": response_data.get("response", "No response received"),
+                            "legacy_service": True,
+                            "service_url": service_url,
+                            "status_code": response.status_code
+                        }
+                        
+                except httpx.HTTPStatusError as e:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {e.response.status_code}: {e.response.text}",
+                        "response": f"Legacy service returned an error (HTTP {e.response.status_code})",
+                        "legacy_service": True
+                    }
+                    
+                except httpx.RequestError as e:
+                    return {
+                        "success": False,
+                        "error": f"Request failed: {str(e)}",
+                        "response": "Unable to connect to legacy service",
+                        "legacy_service": True
+                    }
+            else:
+                # Fallback using requests if httpx is not available
+                if requests is None:
+                    return {
+                        "success": False,
+                        "error": "Neither httpx nor requests library available",
+                        "response": "HTTP client libraries not installed",
+                        "legacy_service": True
+                    }
+                
+                response = requests.post(
+                    f"{service_url.rstrip('/')}/ai/chat",
+                    json=payload,
+                    headers=headers,
+                    timeout=30
+                )
+                response.raise_for_status()
+                
+                response_data = response.json()
+                return {
+                    "success": True,
+                    "response": response_data.get("response", "No response received"),
+                    "legacy_service": True,
+                    "service_url": service_url,
+                    "status_code": response.status_code
+                }
+                
+        except Exception as e:
+            _logger.error(f"Error connecting to legacy service: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "response": "Failed to connect to legacy service",
+                "legacy_service": True
+            }
+
     def chat_with_tools(self, messages: List[Dict], max_iterations: int = 5) -> Dict[str, Any]:
         """
         Chat with OpenAI using tools and return the response.
@@ -312,6 +445,7 @@ class OpenAIClient(models.TransientModel):
     def simple_chat(self, user_message: str, conversation_history: Optional[List[Dict]] = None) -> str:
         """
         Simple chat interface that takes a user message and returns a response.
+        Supports both direct OpenAI integration and legacy service fallback.
         
         Args:
             user_message: The user's message
@@ -320,36 +454,92 @@ class OpenAIClient(models.TransientModel):
         Returns:
             The AI's response as a string
         """
-        # Build messages array
-        messages = conversation_history or []
+        # Check if we should use legacy service
+        service_url = self._get_service_url()
+        openai_api_key = self._get_openai_api_key()
         
-        # Add system message if this is the start of conversation
-        if not messages:
-            messages.append({
-                "role": "system",
-                "content": """You are an AI assistant integrated into Odoo ERP system. You can help users with:
-                - Sales orders: search, view, modify quantities, update states
-                - Products: get information, check stock levels, update prices
-                - CRM leads: create, view, update stages
-                - Customers: view customer information
-                
-                Always be helpful, accurate, and provide clear explanations of what you're doing.
-                When you use tools to retrieve or modify data, explain what you found or what changes you made."""
-            })
+        # Priority: Use OpenAI directly if API key is configured, otherwise try legacy service
+        use_legacy = False
         
-        # Add the user's message
-        messages.append({
-            "role": "user",
-            "content": user_message
-        })
-        
-        # Get response with tools
-        result = self.chat_with_tools(messages)
-        
-        if result.get("success"):
-            return result.get("response", "I apologize, but I couldn't generate a response.")
+        if not openai_api_key and service_url:
+            # No OpenAI key but have service URL - use legacy
+            use_legacy = True
+        elif openai_api_key:
+            # Have OpenAI key - try direct first, fallback to legacy if it fails
+            use_legacy = False
         else:
-            return result.get("response", "I encountered an error processing your request.")
+            # No OpenAI key and no service URL
+            return "AI service is not configured. Please configure either OpenAI API key or external service URL."
+        
+        # Try legacy service first if prioritized
+        if use_legacy:
+            _logger.info("Using legacy service for AI chat")
+            legacy_result = self._send_legacy_service_request(user_message, conversation_history)
+            
+            if legacy_result.get("success"):
+                return legacy_result.get("response", "No response received from legacy service.")
+            else:
+                # If legacy fails and we have OpenAI key, try OpenAI as fallback
+                if openai_api_key:
+                    _logger.info("Legacy service failed, trying OpenAI as fallback")
+                else:
+                    return f"Legacy service error: {legacy_result.get('response', 'Unknown error')}"
+        
+        # Use OpenAI direct integration
+        try:
+            # Build messages array
+            messages = conversation_history or []
+            
+            # Add system message if this is the start of conversation
+            if not messages:
+                messages.append({
+                    "role": "system",
+                    "content": """You are an AI assistant integrated into Odoo ERP system. You can help users with:
+                    - Sales orders: search, view, modify quantities, update states
+                    - Products: get information, check stock levels, update prices
+                    - CRM leads: create, view, update stages
+                    - Customers: view customer information
+                    
+                    Always be helpful, accurate, and provide clear explanations of what you're doing.
+                    When you use tools to retrieve or modify data, explain what you found or what changes you made."""
+                })
+            
+            # Add the user's message
+            messages.append({
+                "role": "user",
+                "content": user_message
+            })
+            
+            # Get response with tools
+            result = self.chat_with_tools(messages)
+            
+            if result.get("success"):
+                return result.get("response", "I apologize, but I couldn't generate a response.")
+            else:
+                # If OpenAI fails and we have service URL, try legacy as fallback
+                if service_url and not use_legacy:
+                    _logger.info("OpenAI failed, trying legacy service as fallback")
+                    legacy_result = self._send_legacy_service_request(user_message, conversation_history)
+                    
+                    if legacy_result.get("success"):
+                        return legacy_result.get("response", "No response received from legacy service.")
+                    else:
+                        return f"Both OpenAI and legacy service failed. OpenAI: {result.get('response', 'Unknown error')}. Legacy: {legacy_result.get('response', 'Unknown error')}"
+                else:
+                    return result.get("response", "I encountered an error processing your request.")
+                    
+        except Exception as e:
+            _logger.error(f"Error in simple_chat: {e}")
+            
+            # Try legacy service as last resort if available
+            if service_url and not use_legacy:
+                _logger.info("OpenAI exception occurred, trying legacy service as fallback")
+                legacy_result = self._send_legacy_service_request(user_message, conversation_history)
+                
+                if legacy_result.get("success"):
+                    return legacy_result.get("response", "No response received from legacy service.")
+            
+            return f"I encountered an error processing your request: {str(e)}"
 
     def _test_openai_threaded(self, api_key: str) -> Dict[str, Any]:
         """
@@ -402,112 +592,197 @@ class OpenAIClient(models.TransientModel):
 
     def test_openai_connection(self) -> Dict[str, Any]:
         """
-        Test the OpenAI API connection with a simple ping.
+        Test the AI connections (both OpenAI and legacy service).
         
         Returns:
             Dictionary with connection test results
         """
-        # Debug: Check API key
-        api_key = self._get_openai_api_key()
-        if not api_key:
-            return {
+        results = {
+            "openai": {"configured": False, "tested": False},
+            "legacy_service": {"configured": False, "tested": False},
+            "overall_success": False,
+            "available_methods": []
+        }
+        
+        # Test OpenAI connection
+        openai_api_key = self._get_openai_api_key()
+        if openai_api_key:
+            results["openai"]["configured"] = True
+            results["openai"]["tested"] = True
+            
+            # Debug: Check OpenAI library
+            if OpenAI is None:
+                results["openai"]["success"] = False
+                results["openai"]["error"] = "OpenAI library not available"
+                results["openai"]["message"] = "OpenAI library not installed"
+            else:
+                # First try the threaded approach (might work better in Odoo web context)
+                _logger.info("Trying threaded OpenAI connection test")
+                threaded_result = self._test_openai_threaded(openai_api_key)
+                
+                if threaded_result.get("success"):
+                    results["openai"].update({
+                        "success": True,
+                        "message": "OpenAI connection successful (threaded)",
+                        "response": threaded_result.get("response"),
+                        "model_used": "gpt-4o-mini",
+                        "config_used": "threaded"
+                    })
+                    results["available_methods"].append("OpenAI Direct")
+                    results["overall_success"] = True
+                else:
+                    # Try other configurations if threaded failed
+                    clients_to_try = []
+                    
+                    # Configuration 1: Basic httpx timeout (simplified)
+                    if httpx is not None:
+                        try:
+                            clients_to_try.append((
+                                "simple_httpx",
+                                OpenAI(
+                                    api_key=openai_api_key,
+                                    timeout=httpx.Timeout(30.0, connect=30.0),
+                                    max_retries=1
+                                )
+                            ))
+                        except Exception as e:
+                            _logger.warning(f"Failed to create simple httpx client: {e}")
+                    
+                    # Configuration 2: Most basic client
+                    try:
+                        clients_to_try.append((
+                            "basic",
+                            OpenAI(api_key=openai_api_key, max_retries=1)
+                        ))
+                    except Exception as e:
+                        _logger.warning(f"Failed to create basic client: {e}")
+                    
+                    # Try each client configuration
+                    openai_success = False
+                    last_error = None
+                    
+                    for config_name, client in clients_to_try:
+                        try:
+                            _logger.info(f"Trying OpenAI connection with {config_name} configuration")
+                            
+                            # Make a simple API call to test connection
+                            response = client.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[{"role": "user", "content": "Say 'OK'"}],
+                                max_tokens=5,
+                                temperature=0
+                            )
+                            
+                            results["openai"].update({
+                                "success": True,
+                                "message": f"OpenAI connection successful with {config_name}",
+                                "response": response.choices[0].message.content.strip(),
+                                "model_used": "gpt-4o-mini",
+                                "config_used": config_name
+                            })
+                            results["available_methods"].append("OpenAI Direct")
+                            results["overall_success"] = True
+                            openai_success = True
+                            break
+                            
+                        except Exception as e:
+                            last_error = e
+                            _logger.warning(f"OpenAI connection failed with {config_name}: {e}")
+                            continue
+                    
+                    if not openai_success:
+                        results["openai"].update({
+                            "success": False,
+                            "error": str(last_error) if last_error else "Unknown error",
+                            "message": f"All OpenAI configurations failed. Threaded: {threaded_result.get('error')}, Last: {str(last_error) if last_error else 'Unknown'}",
+                            "threaded_error": threaded_result.get("error")
+                        })
+        
+        # Test Legacy Service connection
+        service_url = self._get_service_url()
+        if service_url and service_url != 'http://localhost:8001':  # Don't test default placeholder URL
+            results["legacy_service"]["configured"] = True
+            results["legacy_service"]["tested"] = True
+            
+            legacy_test_result = self.test_legacy_service_connection()
+            results["legacy_service"].update(legacy_test_result)
+            
+            if legacy_test_result.get("success"):
+                results["available_methods"].append("Legacy Service")
+                results["overall_success"] = True
+        elif service_url:
+            results["legacy_service"]["configured"] = True
+            results["legacy_service"]["message"] = "Default URL not tested (http://localhost:8001)"
+        
+        # Final result summary
+        if not results["openai"]["configured"] and not results["legacy_service"]["configured"]:
+            results.update({
                 "success": False,
-                "error": "No API key configured",
-                "message": "API key not configured in system parameters"
-            }
-        
-        # Debug: Check OpenAI library
-        if OpenAI is None:
-            return {
+                "error": "No AI service configured",
+                "message": "Neither OpenAI API key nor legacy service URL are configured"
+            })
+        elif not results["available_methods"]:
+            results.update({
                 "success": False,
-                "error": "OpenAI library not available",
-                "message": "OpenAI library not installed"
-            }
-        
-        # First try the threaded approach (might work better in Odoo web context)
-        _logger.info("Trying threaded OpenAI connection test")
-        threaded_result = self._test_openai_threaded(api_key)
-        
-        if threaded_result.get("success"):
-            return {
+                "error": "No working AI service found",
+                "message": "AI services are configured but none are working"
+            })
+        else:
+            results.update({
                 "success": True,
-                "message": "OpenAI connection successful (threaded)",
-                "response": threaded_result.get("response"),
-                "model_used": "gpt-4o-mini",
-                "api_key_preview": f"{api_key[:10]}..." if api_key else "None",
-                "config_used": "threaded"
-            }
+                "message": f"AI services available: {', '.join(results['available_methods'])}"
+            })
         
-        # If threaded approach failed, try the regular configurations
-        clients_to_try = []
+        return results
+
+    def test_legacy_service_connection(self) -> Dict[str, Any]:
+        """
+        Test the legacy service connection.
         
-        # Configuration 1: Basic httpx timeout (simplified)
-        if httpx is not None:
-            try:
-                clients_to_try.append((
-                    "simple_httpx",
-                    OpenAI(
-                        api_key=api_key,
-                        timeout=httpx.Timeout(30.0, connect=30.0),
-                        max_retries=1
-                    )
-                ))
-            except Exception as e:
-                _logger.warning(f"Failed to create simple httpx client: {e}")
+        Returns:
+            Dictionary with connection test results
+        """
+        service_url = self._get_service_url()
+        legacy_api_key = self._get_legacy_api_key()
         
-        # Configuration 2: Most basic client
-        try:
-            clients_to_try.append((
-                "basic",
-                OpenAI(api_key=api_key, max_retries=1)
-            ))
-        except Exception as e:
-            _logger.warning(f"Failed to create basic client: {e}")
-        
-        if not clients_to_try:
+        if not service_url:
             return {
                 "success": False,
-                "error": "Could not create any OpenAI client",
-                "message": f"Failed to initialize OpenAI client. Threaded error: {threaded_result.get('error', 'Unknown')}"
+                "error": "No service URL configured",
+                "message": "Legacy service URL not configured in system parameters"
             }
-
-        # Try each client configuration
-        last_error = None
-        for config_name, client in clients_to_try:
-            try:
-                _logger.info(f"Trying OpenAI connection with {config_name} configuration")
-                
-                # Make a simple API call to test connection
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": "Say 'OK'"}],
-                    max_tokens=5,
-                    temperature=0
-                )
-                
+        
+        try:
+            # Test message
+            test_message = "Hello, this is a connection test."
+            
+            # Send test request
+            result = self._send_legacy_service_request(test_message)
+            
+            if result.get("success"):
                 return {
                     "success": True,
-                    "message": f"OpenAI connection successful with {config_name}",
-                    "response": response.choices[0].message.content.strip(),
-                    "model_used": "gpt-4o-mini",
-                    "api_key_preview": f"{api_key[:10]}..." if api_key else "None",
-                    "config_used": config_name
+                    "message": "Legacy service connection successful",
+                    "service_url": service_url,
+                    "has_api_key": bool(legacy_api_key),
+                    "response": result.get("response", "No response"),
+                    "status_code": result.get("status_code")
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": result.get("error", "Unknown error"),
+                    "message": f"Legacy service connection failed: {result.get('response', 'Unknown error')}",
+                    "service_url": service_url,
+                    "has_api_key": bool(legacy_api_key)
                 }
                 
-            except Exception as e:
-                last_error = e
-                _logger.warning(f"OpenAI connection failed with {config_name}: {e}")
-                continue
-        
-        # If we get here, all configurations failed
-        _logger.error(f"All OpenAI client configurations failed. Last error: {last_error}")
-        return {
-            "success": False,
-            "error": str(last_error),
-            "message": f"All OpenAI configurations failed. Threaded: {threaded_result.get('error')}, Last: {str(last_error)}",
-            "api_key_preview": f"{api_key[:10]}..." if api_key else "None",
-            "error_type": type(last_error).__name__ if last_error else "Unknown",
-            "configs_tried": [name for name, _ in clients_to_try],
-            "threaded_error": threaded_result.get("error")
-        }
+        except Exception as e:
+            _logger.error(f"Error testing legacy service: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Legacy service test failed: {str(e)}",
+                "service_url": service_url
+            }
 
